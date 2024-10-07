@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import torch
 import os,cv2
 import argparse
@@ -24,7 +27,7 @@ class Detection:
 
 
     def __str__(self):
-        return 'd{}, bb_box:[{},{},{},{}], conf={:.2f}, class{}, uv:[{:.0f},{:.0f}], mapped to:[{:.1f},{:.1f}]'.format(
+        return 'd{}, bb_box:[{},{},{},{}], conf={:.2f}, class {}, uv:[{:.0f},{:.0f}], mapped to:[{:.1f},{:.1f}]'.format(
             self.id, self.bb_left, self.bb_top, self.bb_width, self.bb_height, self.conf, self.det_class,
             self.bb_left+self.bb_width/2,self.bb_top+self.bb_height,self.y[0,0],self.y[1,0])
 
@@ -90,7 +93,7 @@ class Detector:
 
 def main(args):
 
-    class_list = [2,5,7]
+    class_list = [0]
 
     cap = cv2.VideoCapture(args.video)
 
@@ -147,8 +150,8 @@ def main(args):
 
 
 parser = argparse.ArgumentParser(description='Process some arguments.')
-parser.add_argument('--video', type=str, default = "demo/demo.mp4", help='video file name')
-parser.add_argument('--cam_para', type=str, default = "demo/cam_para.txt", help='camera parameter file name')
+parser.add_argument('--video', type=str, default = "/home/setare/Vision/Work/test/S500 'Night Flyer' Quadcopter agility testing.mp4", help='video file name')
+parser.add_argument('--cam_para', type=str, default = "demo/cam_para_test1.txt", help='camera parameter file name')
 parser.add_argument('--wx', type=float, default=5, help='wx')
 parser.add_argument('--wy', type=float, default=5, help='wy')
 parser.add_argument('--vmax', type=float, default=10, help='vmax')
