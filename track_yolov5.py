@@ -10,7 +10,7 @@ from detector.mapper import Mapper
 import numpy as np
 
 
-# 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
+# Define a Detection class, including id, bb_left, bb_top, bb_width, bb_height, conf, det_class
 class Detection:
 
     def __init__(self, id, bb_left = 0, bb_top = 0, bb_width = 0, bb_height = 0, conf = 0, det_class = 0):
@@ -35,7 +35,7 @@ class Detection:
         return self.__str__()
 
 
-# Detector类，用于从Yolo检测器获取目标检测的结果
+# Detector class, used to obtain the results of target detection from the Yolo detector
 class Detector:
     def __init__(self):
         self.seq_length = 0
@@ -56,10 +56,10 @@ class Detector:
         
         dets = []
 
-        # 将帧从 BGR 转换为 RGB（因为 OpenCV 使用 BGR 格式）  
+        # Convert frames from BGR to RGB (because OpenCV uses BGR format)  
         frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
 
-        # 使用 RTDETR 进行推理  
+        # Using YOLOv5 for inference 
         results = self.model(frame)
         preds = results.xyxy[0].cpu().numpy()
         # print(results)
@@ -75,7 +75,7 @@ class Detector:
             if w <= 10 and h <= 10 or cls_id not in det_classes or conf <= conf_thresh:
                 continue
 
-            # 新建一个Detection对象
+            # Create a new Detection object
             det = Detection(det_id)
             det.bb_left = x1
             det.bb_top = y1
@@ -97,16 +97,16 @@ def main(args):
 
     cap = cv2.VideoCapture(args.video)
 
-    # 获取视频的 fps
+    # Get fps of video
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # 获取视频的宽度和高度
+    # Get the width and height of the video
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     video_out = cv2.VideoWriter('output/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))  
 
-    # 打开一个cv的窗口，指定高度和宽度
+    # Open a cv window and specify the height and width
     cv2.namedWindow("demo", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("demo", width, height)
 
@@ -116,7 +116,7 @@ def main(args):
     
     tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
 
-    # 循环读取视频帧
+    # Loop to read video frames
     frame_id = 1
     while True:
         ret, frame_img = cap.read()
@@ -128,17 +128,17 @@ def main(args):
         tracker.update(dets,frame_id)
 
         for det in dets:
-            # 画出检测框
+            # Draw detection box
             if det.track_id > 0:
                 cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
-                # 画出检测框的id
+                # write the id of the detection box
                 cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         frame_id += 1
 
 
-        # 显示当前帧
-        cv2.imshow("demo", frame_img)
+        # Show current frame
+        cv2.imshow("Frame", frame_img)
         cv2.waitKey(1)
 
         video_out.write(frame_img)
