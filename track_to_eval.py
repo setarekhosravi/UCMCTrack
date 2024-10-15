@@ -11,6 +11,7 @@
 
 import torch
 import os,cv2
+import time
 import argparse
 
 from tracker.ucmc import UCMCTrack
@@ -165,61 +166,187 @@ class Detector:
 
         return dets
     
+def get_image_list(path):
+    image_names = []
+    for maindir, subdir, file_name_list in os.walk(path):
+        for filename in file_name_list:
+            apath = osp.join(maindir, filename)
+            ext = osp.splitext(apath)[1]
+            if ext in IMAGE_EXT:
+                image_names.append(apath)
+    return image_names
+    
 
 def main(args):
 
-    class_list = [0]
+    file = args.input_type
+    if file.lower() == "video":
 
-    cap = cv2.VideoCapture(args.video)
+        det_time = []
+        track_time = []
+        track_det = []
+        results = []
+        class_list = [0]
 
-    # Get fps of video
-    fps = cap.get(cv2.CAP_PROP_FPS)
+        cap = cv2.VideoCapture(args.video)
 
-    # Get the width and height of the video
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # Get fps of video
+        fps = cap.get(cv2.CAP_PROP_FPS)
 
-    video_out = cv2.VideoWriter('output/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))  
+        # Get the width and height of the video
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # Open a cv window and specify the height and width
-    cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Frame", width, height)
+        video_out = cv2.VideoWriter('output/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))  
 
-    detector = Detector(args=args)
-    detector.load(args.cam_para)
+        # Open a cv window and specify the height and width
+        cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Frame", width, height)
 
-    tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
+        detector = Detector(args=args)
+        detector.load(args.cam_para)
 
-    # Loop to read video frames
-    frame_id = 0
-    while True:
-        ret, frame_img = cap.read()
-        if not ret:  
-            break
-    
-        dets = detector.get_dets(frame_img,args.conf_thresh,class_list, frame_id=frame_id)
-        # print(dets)
-        tracker.update(dets,frame_id + 1)
+        tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
 
-        for det in dets:
-            # Draw detection box
-            if det.track_id > 0:
+        # Loop to read video frames
+        frame_id = 1
+        while True:
+            ret, frame_img = cap.read()
+            if not ret:  
+                break
+            
+            t1 = time.time()
+            dets = detector.get_dets(frame_img,args.conf_thresh,class_list, frame_id=frame_id)
+            t2 = time.time()
+            # print(dets)
+            tracker.update(dets,frame_id)
+            t3 = time.time()
+
+            for det in dets:
+                # Draw detection box
+                # if det.track_id > 0:
+                cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
+                # write the id of the detection box
+                cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
                 # write the id of the detection box
                 cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-        frame_id += 1
+                x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
+                results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
+
+            frame_id += 1
+
+            det_time.append(t2-t1)
+            track_time.append(t3-t2)
+            track_det.append(t3-t1)
+
+            # Show current frame
+            cv2.imshow("Frame", frame_img)
+            cv2.waitKey(1)
+
+            video_out.write(frame_img)
+        
+        cap.release()
+        video_out.release()
+        cv2.destroyAllWindows()
+
+        avg_time_det = sum(det_time)/len(det_time)
+        avg_time_track = sum(track_time)/len(track_time)
+        avg_time_loop = sum(track_det)/len(track_det)
+
+        fps_det = 1/avg_time_det
+        fps_track = 1/avg_time_track
+        fps_all = 1/avg_time_loop
+
+        print(f"Average Inference Time for Detection: {avg_time_det}, FPS: {fps_det}")
+        print(f"Average Inference Time for Tracking: {avg_time_track}, FPS: {fps_track}")
+        print(f"Average Inference Time for All processes: {avg_time_loop}, FPS: {fps_all}")
 
 
-        # Show current frame
-        cv2.imshow("Frame", frame_img)
-        cv2.waitKey(1)
+    elif file.lower() == "image":
+        img_path = args.input_path
+        if os.path.isdir(img_path):
+            files = get_image_list(img_path)
+        files.sort()
 
-        video_out.write(frame_img)
-    
-    cap.release()
-    video_out.release()
-    cv2.destroyAllWindows()
+        det_time = []
+        track_time = []
+        track_det = []
+        results = []
+        class_list = [0]
+        frame_id = 1
+
+        detector = Detector(args=args)
+        detector.load(args.cam_para)
+
+        tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
+
+        for path in files:
+            frame_img = cv2.imread(path)
+
+            t1 = time.time()
+            dets = detector.get_dets(frame_img,args.conf_thresh,class_list, frame_id=frame_id)
+            t2 = time.time()
+            # print(dets)
+            tracker.update(dets,frame_id)
+            t3 = time.time()
+
+            for det in dets:
+                # Draw detection box
+                # if det.track_id > 0:
+                cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
+                # write the id of the detection box
+                cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
+                results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
+
+
+            frame_id += 1
+
+            det_time.append(t2-t1)
+            track_time.append(t3-t2)
+            track_det.append(t3-t1)
+
+            # Show current frame
+            cv2.imshow("Frame", frame_img)
+            cv2.waitKey(1)
+
+        cv2.destroyAllWindows()
+
+        avg_time_det = sum(det_time)/len(det_time)
+        avg_time_track = sum(track_time)/len(track_time)
+        avg_time_loop = sum(track_det)/len(track_det)
+
+        fps_det = 1/avg_time_det
+        fps_track = 1/avg_time_track
+        fps_all = 1/avg_time_loop
+
+        print(f"Average Inference Time for Detection: {avg_time_det}, FPS: {fps_det}")
+        print(f"Average Inference Time for Tracking: {avg_time_track}, FPS: {fps_track}")
+        print(f"Average Inference Time for All processes: {avg_time_loop}, FPS: {fps_all}")
+
+
+    else:
+        raise ValueError("Invalid input type, choose from: video, image")
+
+    if args.save_mot.lower()=="true":
+            save = True
+    else:
+        save = False
+
+    if save:
+        if not os.path.exists(args.save_path):
+            os.makedirs(args.save_path)
+            print("Save path created!")
+
+        output_file = args.save_path + f"/{args.input_path.split('/')[-2]}.txt"
+        with open(output_file, 'w') as f:
+            for result in results:
+                line = ",".join(map(str, result))
+                f.write(line + "\n")
+        print(f"Tracking results saved to {output_file}")
 
 
 if __name__ == "__main__":
@@ -239,11 +366,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_mot', type=str, required=True, help="save results in mot format")
     parser.add_argument('--save_path', type=str, required=False, help="path to folder for saving results")
     parser.add_argument('--gt', type=str, required=False, help="path to gt.txt file")
-    parser.add_argument('--save_video', type=str, required=False, help="if you want to save the tracking result visualization set it True")
 
     args = parser.parse_args()
 
     main(args)
-
-
-
