@@ -92,8 +92,12 @@ class Detector:
         # selct device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
         half = self.device.type != 'cpu'  # half precision only supported on CUDA
+        if self.args.gt.lower() == 'false':
+            self.gt = False
+        else:
+            self.gt = True
 
-        if not self.args.gt:
+        if not self.gt:
             # loading model using torch.hub
             self.model = torch.hub.load('ultralytics/yolov5', 'custom', path= self.args.weights, force_reload= False)
             self.model.float()
@@ -102,7 +106,7 @@ class Detector:
         else:
             self.gt_path = self.args.gt
 
-    def get_dets(self, img,conf_thresh = 0,det_classes = [0], frame_id=1):
+    def get_dets(self, img, conf_thresh = 0,det_classes = [0], frame_id=1):
         
         dets = []
 
@@ -113,9 +117,13 @@ class Detector:
         results = self.model(frame)
         preds = results.xyxy[0].cpu().numpy()
         # print(results)
+        if self.args.gt.lower() == 'false':
+            self.gt = False
+        else:
+            self.gt = True
 
         det_id = 0
-        if not self.args.gt:
+        if not self.gt:
             for pred in preds:
                 # conf = box.conf.cpu().numpy()[0]
                 # bbox = box.xyxy.cpu().numpy()[0]
@@ -170,8 +178,8 @@ def get_image_list(path):
     image_names = []
     for maindir, subdir, file_name_list in os.walk(path):
         for filename in file_name_list:
-            apath = osp.join(maindir, filename)
-            ext = osp.splitext(apath)[1]
+            apath = os.path.join(maindir, filename)
+            ext = os.path.splitext(apath)[1]
             if ext in IMAGE_EXT:
                 image_names.append(apath)
     return image_names
@@ -188,7 +196,7 @@ def main(args):
         results = []
         class_list = [0]
 
-        cap = cv2.VideoCapture(args.video)
+        cap = cv2.VideoCapture(args.input_path)
 
         # Get fps of video
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -224,16 +232,16 @@ def main(args):
 
             for det in dets:
                 # Draw detection box
-                # if det.track_id > 0:
-                cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
-                # write the id of the detection box
-                cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
-                # write the id of the detection box
-                cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                if det.track_id > 0:
+                    cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
+                    # write the id of the detection box
+                    cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
+                    # write the id of the detection box
+                    cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
-                results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
+                    x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
+                    results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
 
             frame_id += 1
 
@@ -265,6 +273,7 @@ def main(args):
 
 
     elif file.lower() == "image":
+        fps = 30
         img_path = args.input_path
         if os.path.isdir(img_path):
             files = get_image_list(img_path)
@@ -294,13 +303,13 @@ def main(args):
 
             for det in dets:
                 # Draw detection box
-                # if det.track_id > 0:
-                cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
-                # write the id of the detection box
-                cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                if det.track_id > 0:
+                    cv2.rectangle(frame_img, (int(det.bb_left), int(det.bb_top)), (int(det.bb_left+det.bb_width), int(det.bb_top+det.bb_height)), (0, 255, 0), 2)
+                    # write the id of the detection box
+                    cv2.putText(frame_img, str(det.track_id), (int(det.bb_left), int(det.bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
-                results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
+                    x1, y1, w, h, track_id, conf = det.bb_left, det.bb_top, det.bb_width, det.bb_height, det.track_id, det.conf
+                    results.append([frame_id, track_id, x1, y1, w, h, conf, -1, -1, -1])
 
 
             frame_id += 1
@@ -351,7 +360,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some arguments.')
-    parser.add_argument('--video', type=str, default = "/home/setare/Vision/Work/test/S500 'Night Flyer' Quadcopter agility testing.mp4", help='video file name')
     parser.add_argument('--cam_para', type=str, default = "demo/cam_para_test1.txt", help='camera parameter file name')
     parser.add_argument('--weights', type=str, help="detector weights path")
     parser.add_argument('--wx', type=float, default=5, help='wx')
