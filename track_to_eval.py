@@ -104,7 +104,8 @@ class Detector:
             self.model.eval()
 
         else:
-            self.gt_path = self.args.gt
+            self.gt_path = os.path.join("/".join(self.args.input_path.split("/")[:-1]), "gt/gt.txt")
+            # print(self.gt_path)
 
     def get_dets(self, img, conf_thresh = 0,det_classes = [0], frame_id=1):
         
@@ -113,9 +114,6 @@ class Detector:
         # Convert frames from BGR to RGB (because OpenCV uses BGR format)  
         frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
 
-        # Using YOLOv5 for inference 
-        results = self.model(frame)
-        preds = results.xyxy[0].cpu().numpy()
         # print(results)
         if self.args.gt.lower() == 'false':
             self.gt = False
@@ -124,6 +122,10 @@ class Detector:
 
         det_id = 0
         if not self.gt:
+             # Using YOLOv5 for inference 
+            results = self.model(frame)
+            preds = results.xyxy[0].cpu().numpy()
+            
             for pred in preds:
                 # conf = box.conf.cpu().numpy()[0]
                 # bbox = box.xyxy.cpu().numpy()[0]
@@ -149,6 +151,7 @@ class Detector:
 
         else:
             preds = self.read_gt(self.gt_path)[frame_id]
+            # print(preds)
             for pred in preds:
                 # conf = box.conf.cpu().numpy()[0]
                 # bbox = box.xyxy.cpu().numpy()[0]
@@ -156,8 +159,8 @@ class Detector:
                 x1,y1,x2,y2, conf, cls_id = pred
                 w = x2 - x1
                 h = y2 - y1
-                if cls_id not in det_classes or conf <= conf_thresh:
-                    continue
+                # if cls_id not in det_classes or conf <= conf_thresh:
+                #     continue
 
                 # Create a new Detection object
                 det = Detection(det_id)
